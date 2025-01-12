@@ -15,15 +15,27 @@ except json.JSONDecodeError:
     print("Error: config.json is not a valid JSON file.")
     exit(1)
 
+try:
+    redis_client = redis.StrictRedis(host='localhost', port=6379, decode_responses=True)
+except FileNotFoundError:
+    print("Error: Redis connection failed.")
+    exit(1)
+
 table_data = {}
 
 def get_mysql_connection():
-    return mysql.connector.connect(
-        host=db_config['host'],
-        user=db_config['user'],
-        password=db_config['password'],
-        database=db_config['database']
-    )
+    print("get_mysql_connection")
+    try: 
+        connection = mysql.connector.connect(
+            host=db_config['host'],
+            user=db_config['user'],
+            password=db_config['password'],
+            database=db_config['database']
+        )
+        return connection
+    except FileNotFoundError:
+        print("mysql connection failed.")
+        exit(1)
 
 def load_table_data():
     global table_data
