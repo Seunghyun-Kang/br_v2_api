@@ -1,5 +1,5 @@
 from flask import Flask, jsonify, request
-import mysql.connector
+import pymysql
 import redis
 import json
 
@@ -19,22 +19,23 @@ try:
     redis_client = redis.StrictRedis(host='localhost', port=6379, decode_responses=True)
 except FileNotFoundError:
     print("Error: Redis connection failed.")
-    exit(1)
 
 table_data = {}
 
 def get_mysql_connection():
-    print("get_mysql_connection")
-    try: 
-        connection = mysql.connector.connect(
+    try:
+        connection = pymysql.connect(
             host=db_config['host'],
             user=db_config['user'],
             password=db_config['password'],
-            database=db_config['database']
+            database=db_config['database'],
+            cursorclass=pymysql.cursors.DictCursor,
+            connect_timeout=10,
+            autocommit=True
         )
         return connection
-    except FileNotFoundError:
-        print("mysql connection failed.")
+    except pymysql.MySQLError as e:
+        print(f"MySQL connection error: {e}")
         exit(1)
 
 def load_table_data():
@@ -44,14 +45,14 @@ def load_table_data():
 
     try:
         conn = get_mysql_connection()
-        cursor = conn.cursor(dictionary=True)
+        if conn is None:
+            return
 
+        cursor = conn.cursor()
         for table in table_names:
             cursor.execute(f"SELECT code, name, market, sector FROM {table}")
             rows = cursor.fetchall()
             table_data[table] = rows
-
-        print("Table data successfully loaded.")
     except Exception as e:
         print(f"Error loading table data: {e}")
     finally:
@@ -86,7 +87,9 @@ def get_data():
 
     try:
         conn = get_mysql_connection()
-        cursor = conn.cursor(dictionary=True)
+        if conn is None:
+            return jsonify({"error": "Failed to connect to MySQL"}), 500
+        cursor = conn.cursor(cursor=pymysql.cursors.DictCursor)
         table_name = find_table_with_ticker(ticker)
 
         if not table_name:
