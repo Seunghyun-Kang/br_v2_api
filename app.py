@@ -7,6 +7,7 @@ import redis
 from flask import Flask, jsonify, request
 from datetime import datetime
 from contextlib import contextmanager
+import decimal
 
 # ----------------------------
 # ✅ Logging 설정 (print() 대신 사용)
