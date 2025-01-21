@@ -122,14 +122,18 @@ def update_table_data():
         logger.error(f"테이블 업데이트 실패: {e}")
         return jsonify({"error": str(e)}), 500
 
-def convert_decimal_to_float(data):
-    """데이터 내 Decimal 값을 float으로 변환"""
-    if isinstance(data, list):  # 리스트인 경우
-        return [convert_decimal_to_float(item) for item in data]
-    elif isinstance(data, dict):  # 딕셔너리인 경우
-        return {key: convert_decimal_to_float(value) for key, value in data.items()}
-    elif isinstance(data, decimal.Decimal):  # Decimal인 경우 float으로 변환
+def convert_to_serializable(data):
+    """데이터 내 Decimal과 datetime 값을 JSON 직렬화 가능하도록 변환"""
+    if isinstance(data, list):  # 리스트 처리
+        return [convert_to_serializable(item) for item in data]
+    elif isinstance(data, dict):  # 딕셔너리 처리
+        return {key: convert_to_serializable(value) for key, value in data.items()}
+    elif isinstance(data, decimal.Decimal):  # Decimal → float 변환
         return float(data)
+    elif isinstance(data, datetime.datetime):  # datetime → 문자열 변환
+        return data.strftime('%Y-%m-%d %H:%M:%S')  # ✅ 'YYYY-MM-DD HH:MM:SS' 형식
+    elif isinstance(data, datetime.date):  # date → 문자열 변환
+        return data.strftime('%Y-%m-%d')  # ✅ 'YYYY-MM-DD' 형식
     return data  # 다른 타입은 그대로 반환
 
 # ----------------------------
@@ -176,7 +180,7 @@ def get_data():
             return jsonify({"error": f"No data found for ticker {ticker}"}), 404
 
         # ✅ Decimal 값을 float으로 변환
-        records = convert_decimal_to_float(records)
+        records = convert_to_serializable(records)
         # Redis에 데이터 캐싱
         redis_client.setex(cache_key, 300, json.dumps(records))
         
