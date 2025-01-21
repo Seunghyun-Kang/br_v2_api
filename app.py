@@ -102,11 +102,10 @@ def load_table_data():
 # ✅ 티커를 포함하는 테이블 찾기
 # ----------------------------
 def find_table_with_ticker(ticker):
-    """주어진 티커가 포함된 테이블을 찾음"""
     for table_name, rows in table_data.items():
         if any(row.get('code') == ticker for row in rows):
             logger.info(f"✅ {ticker}가 포함된 테이블: {table_name}")
-            return table_name
+            return table_name.replace("_codes", "_prices")
     return None
 
 # ----------------------------
