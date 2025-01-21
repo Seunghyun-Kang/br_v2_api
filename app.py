@@ -45,6 +45,14 @@ except redis.ConnectionError:
     logger.error("Redis 연결 실패.")
     exit(1)
 
+
+# ----------------------------
+# ✅ Flask 실행
+# ----------------------------
+with app.app_context():
+    logger.info("🚀 uWSGI 환경 - 서버 시작 시 테이블 데이터 불러오기")
+    load_table_data()
+    
 # ----------------------------
 # ✅ MySQL 연결을 컨텍스트 매니저로 개선
 # ----------------------------
@@ -172,11 +180,3 @@ def get_data():
     redis_client.setex(cache_key, 300, json.dumps(records))
     
     return jsonify({"code": ticker, "data": records})
-
-# ----------------------------
-# ✅ Flask 실행
-# ----------------------------
-if __name__ != '__main__':  # uWSGI 실행 시에도 적용
-    with app.app_context():
-        logger.info("🚀 uWSGI 환경 - 서버 시작 시 테이블 데이터 불러오기")
-        load_table_data()
