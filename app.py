@@ -51,6 +51,7 @@ except redis.ConnectionError:
 @contextmanager
 def get_mysql_connection():
     """MySQL 연결을 생성하고 자동으로 닫아주는 컨텍스트 매니저"""
+    conn = None  # 연결 초기화
     try:
         conn = pymysql.connect(
             host=db_config['host'],
@@ -61,13 +62,14 @@ def get_mysql_connection():
             connect_timeout=10,
             autocommit=True
         )
-        yield conn
+        yield conn  # 정상적으로 연결되었을 때만 반환
     except pymysql.MySQLError as e:
-        logger.error(f"MySQL 연결 실패: {e}")
-        yield None
+        logger.error(f"❌ MySQL 연결 실패: {e}")
+        return  # `yield None` 대신 `return` 사용하여 예외 발생 시 함수 종료
     finally:
-        if 'conn' in locals() and conn:
+        if conn:  # `conn`이 생성되었을 때만 닫기
             conn.close()
+
 
 # ----------------------------
 # ✅ 테이블 데이터 로드 함수
@@ -143,9 +145,6 @@ def get_data():
         cached_data = json.loads(cached_data)
         return jsonify(cached_data)
 
-    # ----------------------------
-    # ✅ MySQL에서 데이터 조회
-    # ----------------------------
     query = f"""
         SELECT * 
         FROM {table_name}
@@ -153,24 +152,27 @@ def get_data():
         ORDER BY date ASC
     """
 
-    with get_mysql_connection() as conn:
-        if not conn:
-            return jsonify({"error": "Failed to connect to MySQL"}), 500
+    try:
+        with get_mysql_connection() as conn:
+            if not conn:  # MySQL 연결 실패 처리
+                return jsonify({"error": "Failed to connect to MySQL"}), 500
 
-        cursor = conn.cursor()
-        cursor.execute(query, (ticker,))
-        records = cursor.fetchall()
-        cursor.close()
+            cursor = conn.cursor()
+            cursor.execute(query, (ticker,))
+            records = cursor.fetchall()
+            cursor.close()
 
-    if not records:
-        return jsonify({"error": f"No data found for ticker {ticker}"}), 404
+        if not records:
+            return jsonify({"error": f"No data found for ticker {ticker}"}), 404
 
-    # ----------------------------
-    # ✅ Redis에 데이터 캐싱
-    # ----------------------------
-    redis_client.setex(cache_key, 300, json.dumps(records))
-    
-    return jsonify({"code": ticker, "data": records})
+        # Redis에 데이터 캐싱
+        redis_client.setex(cache_key, 300, json.dumps(records))
+        
+        return jsonify({"code": ticker, "data": records})
+
+    except Exception as e:
+        logger.error(f"❌ 데이터 조회 중 오류 발생: {e}")
+        return jsonify({"error": str(e)}), 500
 
 # ----------------------------
 # ✅ Flask 실행 시 테이블 데이터 로드 (순서 중요!)
