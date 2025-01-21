@@ -5,7 +5,7 @@ import logging
 import pymysql
 import redis
 from flask import Flask, jsonify, request
-from datetime import datetime
+from datetime import datetime, date
 from contextlib import contextmanager
 import decimal
 
@@ -122,18 +122,20 @@ def update_table_data():
         logger.error(f"테이블 업데이트 실패: {e}")
         return jsonify({"error": str(e)}), 500
 
+# ----------------------------
+# ✅ 데이터 내 Decimal과 datetime 값을 JSON 직렬화 가능하도록 변환
+# ----------------------------
 def convert_to_serializable(data):
-    """데이터 내 Decimal과 datetime 값을 JSON 직렬화 가능하도록 변환"""
     if isinstance(data, list):  # 리스트 처리
         return [convert_to_serializable(item) for item in data]
     elif isinstance(data, dict):  # 딕셔너리 처리
         return {key: convert_to_serializable(value) for key, value in data.items()}
     elif isinstance(data, decimal.Decimal):  # Decimal → float 변환
         return float(data)
-    elif isinstance(data, datetime.datetime):  # datetime → 문자열 변환
-        return data.strftime('%Y-%m-%d %H:%M:%S')  # ✅ 'YYYY-MM-DD HH:MM:SS' 형식
-    elif isinstance(data, datetime.date):  # date → 문자열 변환
-        return data.strftime('%Y-%m-%d')  # ✅ 'YYYY-MM-DD' 형식
+    elif isinstance(data, datetime):  # ✅ datetime.datetime 대신 datetime 직접 사용
+        return data.strftime('%Y-%m-%d %H:%M:%S')
+    elif isinstance(data, date):  # ✅ datetime.date도 변환
+        return data.strftime('%Y-%m-%d')
     return data  # 다른 타입은 그대로 반환
 
 # ----------------------------
