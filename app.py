@@ -176,6 +176,7 @@ def get_data():
 # ----------------------------
 # ✅ Flask 실행
 # ----------------------------
-if __name__ == '__main__':
-    load_table_data()
-    app.run(debug=True)
+if __name__ != '__main__':  # uWSGI 실행 시에도 적용
+    with app.app_context():
+        logger.info("🚀 uWSGI 환경 - 서버 시작 시 테이블 데이터 불러오기")
+        load_table_data()
