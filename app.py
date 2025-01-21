@@ -9,22 +9,22 @@ try:
     with open('config.json', 'r') as config_file:
         db_config = json.load(config_file)
 except FileNotFoundError:
-    print("Error: config.json file not found.")
+    print("********************Error: config.json file not found.")
     exit(1)
 except json.JSONDecodeError:
-    print("Error: config.json is not a valid JSON file.")
+    print("********************Error: config.json is not a valid JSON file.")
     exit(1)
 
 try:
     redis_client = redis.StrictRedis(host='localhost', port=6379, decode_responses=True)
 except FileNotFoundError:
-    print("Error: Redis connection failed.")
+    print("********************Error: Redis connection failed.")
     exit(1)
 
 table_data = {}
 
 def get_mysql_connection():
-    print("get_mysql_connection")
+    print("********************get_mysql_connection")
     try: 
         connection = mysql.connector.connect(
             host=db_config['host'],
@@ -34,7 +34,7 @@ def get_mysql_connection():
         )
         return connection
     except FileNotFoundError:
-        print("mysql connection failed.")
+        print("********************mysql connection failed.")
         exit(1)
 
 def load_table_data():
@@ -51,7 +51,7 @@ def load_table_data():
             rows = cursor.fetchall()
             table_data[table] = rows
 
-        print("Table data successfully loaded.")
+        print("********************Table data successfully loaded.")
     except Exception as e:
         print(f"Error loading table data: {e}")
     finally:
@@ -64,6 +64,7 @@ def find_table_with_ticker(ticker):
     global table_data
     for table_name, rows in table_data.items():
         if any(row.get('code') == ticker for row in rows):
+            print(f"********************table_name: {table_name}")
             return table_name
     return None
 
@@ -71,6 +72,7 @@ def find_table_with_ticker(ticker):
 def update_table_data():
     try:
         load_table_data()
+        print(table_data)
         return jsonify({"message": "Table data successfully updated"}), 200
     except Exception as e:
         return jsonify({"error": str(e)}), 500
@@ -78,7 +80,7 @@ def update_table_data():
 @app.route('/prices', methods=['GET'])
 def get_data():
     ticker = request.args.get('ticker')
-    start_date = request.args.get('start_date')
+    start_date = request.args.get('t')
     end_date = request.args.get('end_date')
 
     if not ticker:
