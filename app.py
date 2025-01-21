@@ -121,6 +121,16 @@ def update_table_data():
         logger.error(f"테이블 업데이트 실패: {e}")
         return jsonify({"error": str(e)}), 500
 
+def convert_decimal_to_float(data):
+    """데이터 내 Decimal 값을 float으로 변환"""
+    if isinstance(data, list):  # 리스트인 경우
+        return [convert_decimal_to_float(item) for item in data]
+    elif isinstance(data, dict):  # 딕셔너리인 경우
+        return {key: convert_decimal_to_float(value) for key, value in data.items()}
+    elif isinstance(data, decimal.Decimal):  # Decimal인 경우 float으로 변환
+        return float(data)
+    return data  # 다른 타입은 그대로 반환
+
 # ----------------------------
 # ✅ 가격 정보 조회 API
 # ----------------------------
@@ -164,13 +174,18 @@ def get_data():
         if not records:
             return jsonify({"error": f"No data found for ticker {ticker}"}), 404
 
+        # ✅ Decimal 값을 float으로 변환
+        records = convert_decimal_to_float(records)
         # Redis에 데이터 캐싱
         redis_client.setex(cache_key, 300, json.dumps(records))
         
         return jsonify({"code": ticker, "data": records})
 
+    except pymysql.MySQLError as e:
+        logger.error(f"❌ MySQL 쿼리 실행 중 오류 발생: {e}")
+        return jsonify({"error": f"MySQL Error: {str(e)}"}), 500
     except Exception as e:
-        logger.error(f"❌ 데이터 조회 중 오류 발생: {e}")
+        logger.error(f"❌ 데이터 조회 중 예상치 못한 오류 발생: {e}")
         return jsonify({"error": str(e)}), 500
 
 # ----------------------------
