@@ -8,7 +8,7 @@ from flask import Flask, jsonify, request
 from datetime import datetime, date
 from contextlib import contextmanager
 import decimal
-
+from flask_cors import CORS
 # ----------------------------
 # ✅ Logging 설정 (print() 대신 사용)
 # ----------------------------
@@ -26,7 +26,7 @@ logger = logging.getLogger(__name__)
 # ✅ Flask 앱 초기화
 # ----------------------------
 app = Flask(__name__)
-
+CORS(app)
 # ----------------------------
 # ✅ 환경 변수 로드
 # ----------------------------
@@ -155,9 +155,13 @@ def get_data():
     cache_key = f"prices:{ticker}"
     cached_data = redis_client.get(cache_key)
 
-    if cached_data:
-        cached_data = json.loads(cached_data)
-        return jsonify(cached_data)
+    try:
+        if cached_data:
+            cached_data = json.loads(cached_data)
+            logger.info("🚀 redis에서 불러오기 성공")
+            return jsonify(cached_data)
+    except Exception as e:
+        logger.error(f"❌ 데이터 조회 중 예상치 못한 오류 발생: {e}")
 
     query = f"""
         SELECT * 
@@ -183,7 +187,7 @@ def get_data():
         records = convert_to_serializable(records)
         # Redis에 데이터 캐싱
         redis_client.setex(cache_key, 300, json.dumps(records))
-        
+        logger.info("🚀 DB에서 불러오기 성공")
         return jsonify({"code": ticker, "data": records})
 
     except pymysql.MySQLError as e:
