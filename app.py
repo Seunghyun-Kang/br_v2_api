@@ -47,37 +47,6 @@ except redis.ConnectionError:
 
 
 # ----------------------------
-# ✅ Flask 실행
-# ----------------------------
-with app.app_context():
-    logger.info("🚀 uWSGI 환경 - 서버 시작 시 테이블 데이터 불러오기")
-    load_table_data()
-    
-# ----------------------------
-# ✅ MySQL 연결을 컨텍스트 매니저로 개선
-# ----------------------------
-@contextmanager
-def get_mysql_connection():
-    """MySQL 연결을 생성하고 자동으로 닫아주는 컨텍스트 매니저"""
-    try:
-        conn = pymysql.connect(
-            host=db_config['host'],
-            user=db_config['user'],
-            password=db_config['password'],
-            database=db_config['database'],
-            cursorclass=pymysql.cursors.DictCursor,
-            connect_timeout=10,
-            autocommit=True
-        )
-        yield conn
-    except pymysql.MySQLError as e:
-        logger.error(f"MySQL 연결 실패: {e}")
-        yield None
-    finally:
-        if 'conn' in locals() and conn:
-            conn.close()
-
-# ----------------------------
 # ✅ 테이블 데이터 로드 함수
 # ----------------------------
 
@@ -104,6 +73,37 @@ def load_table_data():
             cursor.close()
 
     table_data = new_table_data  # 전역 변수 업데이트
+
+# ----------------------------
+# ✅ Flask 실행
+# ----------------------------
+with app.app_context():
+    logger.info("🚀 uWSGI 환경 - 서버 시작 시 테이블 데이터 불러오기")
+    load_table_data()
+
+# ----------------------------
+# ✅ MySQL 연결을 컨텍스트 매니저로 개선
+# ----------------------------
+@contextmanager
+def get_mysql_connection():
+    """MySQL 연결을 생성하고 자동으로 닫아주는 컨텍스트 매니저"""
+    try:
+        conn = pymysql.connect(
+            host=db_config['host'],
+            user=db_config['user'],
+            password=db_config['password'],
+            database=db_config['database'],
+            cursorclass=pymysql.cursors.DictCursor,
+            connect_timeout=10,
+            autocommit=True
+        )
+        yield conn
+    except pymysql.MySQLError as e:
+        logger.error(f"MySQL 연결 실패: {e}")
+        yield None
+    finally:
+        if 'conn' in locals() and conn:
+            conn.close()
 
 # ----------------------------
 # ✅ 티커를 포함하는 테이블 찾기
