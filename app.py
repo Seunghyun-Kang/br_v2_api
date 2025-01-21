@@ -144,8 +144,6 @@ def convert_to_serializable(data):
 @app.route('/prices', methods=['GET'])
 def get_data():
     ticker = request.args.get('ticker')
-    start_date = request.args.get('t')
-    end_date = request.args.get('end_date')
 
     if not ticker:
         return jsonify({"error": "Missing required parameter: ticker"}), 400
