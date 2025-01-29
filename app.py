@@ -4,6 +4,8 @@ import json
 import logging
 import pymysql
 import redis
+import threading
+import time
 from flask import Flask, jsonify, request
 from datetime import datetime, date
 from contextlib import contextmanager
@@ -93,13 +95,12 @@ def load_table_data():
                 new_table_data[table] = cursor.fetchall()
             logger.info("✅ 테이블 데이터 로드 완료.")
         except pymysql.MySQLError as e:
-            logger.error(f"테이블 데이터 로드 실패: {e}")
+            logger.error(f"❌ 테이블 데이터 로드 실패: {e}")
         finally:
             cursor.close()
 
     table_data = new_table_data  # 전역 변수 업데이트
 
-# ----------------------------
 # ✅ 티커를 포함하는 테이블 찾기
 # ----------------------------
 def find_table_with_ticker(ticker):
@@ -108,6 +109,16 @@ def find_table_with_ticker(ticker):
             logger.info(f"✅ {ticker}가 포함된 테이블: {table_name}")
             return table_name.replace("_codes", "_prices")
     return None
+
+
+# ----------------------------
+# ✅ 3시간마다 테이블 데이터 자동 업데이트
+# ----------------------------
+def periodic_table_update():
+    while True:
+        logger.info("⏳ 3시간마다 테이블 데이터 업데이트 실행 중...")
+        load_table_data()
+        time.sleep(3 * 60 * 60)  # 3시간 = 10800초
 
 # ----------------------------
 # ✅ 테이블 데이터 업데이트 API
@@ -137,6 +148,18 @@ def convert_to_serializable(data):
     elif isinstance(data, date):  # ✅ datetime.date도 변환
         return data.strftime('%Y-%m-%d')
     return data  # 다른 타입은 그대로 반환
+
+
+# ----------------------------
+# ✅ 테이블 정보 조회 API (/tables)
+# ----------------------------
+@app.route('/tables', methods=['GET'])
+def get_tables():
+    """현재 로드된 테이블 데이터를 반환"""
+    if not table_data:
+        return jsonify({"error": "Table data not loaded"}), 500
+
+    return jsonify(table_data), 200
 
 # ----------------------------
 # ✅ 가격 정보 조회 API
@@ -196,6 +219,11 @@ def get_data():
     except Exception as e:
         logger.error(f"❌ 데이터 조회 중 예상치 못한 오류 발생: {e}")
         return jsonify({"error": str(e)}), 500
+
+
+# ✅ 백그라운드에서 자동 실행
+update_thread = threading.Thread(target=periodic_table_update, daemon=True)
+update_thread.start()
 
 # ----------------------------
 # ✅ Flask 실행 시 테이블 데이터 로드 (순서 중요!)
