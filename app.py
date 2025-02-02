@@ -103,13 +103,24 @@ def load_table_data():
 
 # ✅ 티커를 포함하는 테이블 찾기
 # ----------------------------
-def find_table_with_ticker(ticker):
+def find_prices_table_with_ticker(ticker):
     for table_name, rows in table_data.items():
         if any(row.get('code') == ticker for row in rows):
             logger.info(f"✅ {ticker}가 포함된 테이블: {table_name}")
             return table_name.replace("_codes", "_prices")
     return None
 
+def find_signals_table_with_ticker(ticker):
+    for table_name, rows in table_data.items():
+        if any(row.get('code') == ticker for row in rows):
+            logger.info(f"✅ {ticker}가 포함된 테이블: {table_name}")
+            if 'krx' in table_name:
+                return 'krx_signals'
+            elif 'usx' in table_name:
+                return 'usx_signals'
+            else:
+                return 'coin_signals'
+    return None
 
 # ----------------------------
 # ✅ 3시간마다 테이블 데이터 자동 업데이트
@@ -171,7 +182,7 @@ def get_data():
     if not ticker:
         return jsonify({"error": "Missing required parameter: ticker"}), 400
 
-    table_name = find_table_with_ticker(ticker)
+    table_name = find_prices_table_with_ticker(ticker)
     if not table_name:
         return jsonify({"error": f"Ticker {ticker} not found in any table"}), 404
 
@@ -211,6 +222,115 @@ def get_data():
         # Redis에 데이터 캐싱
         redis_client.setex(cache_key, 300, json.dumps(records))
         logger.info("🚀 DB에서 불러오기 성공")
+        return jsonify({"code": ticker, "data": records})
+
+    except pymysql.MySQLError as e:
+        logger.error(f"❌ MySQL 쿼리 실행 중 오류 발생: {e}")
+        return jsonify({"error": f"MySQL Error: {str(e)}"}), 500
+    except Exception as e:
+        logger.error(f"❌ 데이터 조회 중 예상치 못한 오류 발생: {e}")
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/latest_signals', methods=['GET'])
+def get_latest_data():
+    market_type = request.args.get('type')
+    if not market_type:
+        return jsonify({"error": "Missing required parameter: market_type"}), 400
+
+    table_name = None
+    if 'krx' in market_type:
+        table_name = 'krx_signals'
+    elif 'usx' in market_type:
+        table_name = 'usx_signals'
+    else:
+        table_name = 'coin_signals'
+
+    cache_key = f"signals:{market_type}"
+    cached_data = redis_client.get(cache_key)
+    try:
+        if cached_data:
+            cached_data = json.loads(cached_data)
+            logger.info("🚀 Redis 캐시에서 최신 데이터 불러오기 성공")
+            return jsonify(cached_data)
+    except Exception as e:
+        logger.error(f"❌ 캐시 조회 중 오류 발생: {e}")
+
+    query = f"""
+        SELECT * 
+        FROM {table_name}
+        WHERE date = (SELECT MAX(date) FROM {table_name})
+        ORDER BY date ASC;
+    """
+
+    try:
+        with get_mysql_connection() as conn:
+            if not conn:
+                return jsonify({"error": "Failed to connect to MySQL"}), 500
+
+            cursor = conn.cursor()
+            cursor.execute(query)
+            records = cursor.fetchall()
+            cursor.close()
+
+        if not records:
+            return jsonify({"error": f"No data found for type {market_type}"}), 404
+
+        records = convert_to_serializable(records)
+        redis_client.setex(cache_key, 300, json.dumps(records))
+        logger.info("🚀 DB에서 최신 데이터 불러오기 성공")
+        return jsonify(records)
+
+    except pymysql.MySQLError as e:
+        logger.error(f"❌ MySQL 쿼리 실행 중 오류 발생: {e}")
+        return jsonify({"error": f"MySQL Error: {str(e)}"}), 500
+    except Exception as e:
+        logger.error(f"❌ 데이터 조회 중 예상치 못한 오류 발생: {e}")
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/signals', methods=['GET'])
+def get_signals_by_ticker():
+    ticker = request.args.get('ticker')
+    if not ticker:
+        return jsonify({"error": "Missing required parameter: ticker"}), 400
+
+    # 티커에 따른 테이블 선택 (예: 티커 접두사에 따라)
+    table_name = find_signals_table_with_ticker(ticker)
+    if not table_name:
+        return jsonify({"error": f"Ticker {ticker} not found in any table"}), 404
+
+    cache_key = f"signals:ticker:{ticker}"
+    cached_data = redis_client.get(cache_key)
+    try:
+        if cached_data:
+            cached_data = json.loads(cached_data)
+            logger.info("🚀 Redis 캐시에서 특정 티커 signal 데이터 불러오기 성공")
+            return jsonify(cached_data)
+    except Exception as e:
+        logger.error(f"❌ 캐시 조회 중 오류 발생: {e}")
+
+    query = f"""
+        SELECT * 
+        FROM {table_name}
+        WHERE code = %s
+        ORDER BY date ASC;
+    """
+
+    try:
+        with get_mysql_connection() as conn:
+            if not conn:
+                return jsonify({"error": "Failed to connect to MySQL"}), 500
+
+            cursor = conn.cursor()
+            cursor.execute(query, (ticker,))
+            records = cursor.fetchall()
+            cursor.close()
+
+        if not records:
+            return jsonify({"error": f"No data found for ticker {ticker}"}), 404
+
+        records = convert_to_serializable(records)
+        redis_client.setex(cache_key, 300, json.dumps(records))
+        logger.info("🚀 DB에서 특정 티커 signal 데이터 불러오기 성공")
         return jsonify({"code": ticker, "data": records})
 
     except pymysql.MySQLError as e:
