@@ -291,8 +291,10 @@ def get_latest_data():
             """
             cursor = conn.cursor()
             cursor.execute(column_query)
-            signal_columns = [row['COLUMN_NAME'] for row in cursor.fetchall()]
-
+            columns = cursor.fetchall()
+            # signal_columns = [row['COLUMN_NAME'] for row in cursor.fetchall()]
+            logging.info(f"❌ MySQL 쿼리 실행 중 오류 발생: {columns}")
+            print(f"❌ MySQL 쿼리 실행 중 오류 발생: {columns}")
             if not signal_columns:
                 return jsonify({"error": "No 'signal' columns found"}), 404
 
