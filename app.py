@@ -287,13 +287,13 @@ def get_latest_data():
             cursor.close()
             condition = " + ".join([f"({col} = 1 OR {col} = -1)" for col in signal_columns])
 
-        query = f"""
-            SELECT * 
-            FROM {table_name}
-            WHERE date = (SELECT MAX(date) FROM {table_name})
-            AND ({condition}) >= 3
-            ORDER BY date ASC;
-        """
+            query = f"""
+                SELECT * 
+                FROM {table_name}
+                WHERE date = (SELECT MAX(date) FROM {table_name})
+                AND ({condition}) >= 3
+                ORDER BY date ASC;
+            """
         with get_mysql_connection() as conn:
             if not conn:
                 return jsonify({"error": "Failed to connect to MySQL"}), 500
