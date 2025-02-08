@@ -261,6 +261,7 @@ def get_latest_data():
         table_name = 'usx_signals'
     else:
         table_name = 'coin_signals'
+    database = 'be_rich'
 
     # Redis 캐시 확인
     cache_key = f"signals:{market_type}"
@@ -285,16 +286,16 @@ def get_latest_data():
             column_query = f"""
                 SELECT COLUMN_NAME
                 FROM INFORMATION_SCHEMA.COLUMNS
-                WHERE TABLE_SCHEMA = 'your_database' 
+                WHERE TABLE_SCHEMA = '{database}' 
                 AND TABLE_NAME = '{table_name}'
                 AND COLUMN_NAME LIKE '%signal%'
             """
             cursor = conn.cursor()
             cursor.execute(column_query)
             columns = cursor.fetchall()
-            # signal_columns = [row['COLUMN_NAME'] for row in cursor.fetchall()]
-            logging.info(f"❌ MySQL 쿼리 실행 중 오류 발생: {columns}")
-            print(f"❌ MySQL 쿼리 실행 중 오류 발생: {columns}")
+            signal_columns = [row['COLUMN_NAME'] for row in columns]
+            logging.info(f"❌ 검색 칼럼: {columns}")
+            print(f"❌ 검색 칼럼: {columns}")
             if not signal_columns:
                 return jsonify({"error": "No 'signal' columns found"}), 404
 
