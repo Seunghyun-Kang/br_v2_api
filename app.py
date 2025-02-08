@@ -272,26 +272,24 @@ def get_latest_data():
     except Exception as e:
         logger.error(f"❌ 캐시 조회 중 오류 발생: {e}")
 
+    column_query = f"""
+        SELECT name FROM PRAGMA_TABLE_INFO('{table_name}')
+        WHERE name LIKE '%signal%'
+    """
+
+    # 컬럼명 리스트 가져오기
+    cursor.execute(column_query)
+    signal_columns = [row[0] for row in cursor.fetchall()]
+
+    # SQL 조건문 동적 생성 (각 컬럼 값이 1 또는 -1인 개수 계산)
+    condition = " + ".join([f"({col} = 1 OR {col} = -1)" for col in signal_columns])
+
+    # 최종 쿼리 생성
     query = f"""
         SELECT * 
         FROM {table_name}
         WHERE date = (SELECT MAX(date) FROM {table_name})
-        AND (
-            SELECT COUNT(*)
-            FROM information_schema.columns
-            WHERE table_name = '{table_name}'
-            AND column_name LIKE '%signal%'
-        ) >= 3
-        AND (
-            SELECT COUNT(*) 
-            FROM (SELECT * FROM {table_name} WHERE date = (SELECT MAX(date) FROM {table_name})) AS sub
-            WHERE 
-                (column1 = 1 OR column1 = -1) +
-                (column2 = 1 OR column2 = -1) +
-                (column3 = 1 OR column3 = -1) + 
-                ...  -- 여기에 모든 'signal' 관련 컬럼 추가
-            >= 3
-        )
+        AND ({condition}) >= 3
         ORDER BY date ASC;
     """
 
