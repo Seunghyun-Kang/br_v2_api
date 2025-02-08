@@ -309,6 +309,7 @@ def get_latest_data():
             """
             cursor.execute(query)
             records = cursor.fetchall()
+            cursor.close()
 
             if not records:
                 return jsonify({"error": f"No data found for type {market_type}"}), 404
@@ -328,8 +329,6 @@ def get_latest_data():
         logging.error(f"❌ 데이터 조회 중 예상치 못한 오류 발생: {e}")
         return jsonify({"error": str(e)}), 500
 
-    finally:
-        conn.close()  # 항상 MySQL 연결 종료
 
 @app.route('/signals', methods=['GET'])
 def get_signals_by_ticker():
