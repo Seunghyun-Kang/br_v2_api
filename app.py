@@ -306,7 +306,7 @@ def get_latest_data():
                 SELECT * 
                 FROM {table_name}
                 WHERE date = (SELECT MAX(date) FROM {table_name})
-                AND ({buy_condition}) >= 2
+                AND ({buy_condition}) >= 3
                 ORDER BY date ASC;
             """
             cursor.execute(query)
@@ -320,7 +320,7 @@ def get_latest_data():
                 SELECT * 
                 FROM {table_name}
                 WHERE date = (SELECT MAX(date) FROM {table_name})
-                AND ({sell_condition}) >= 2
+                AND ({sell_condition}) >= 3
                 ORDER BY date ASC;
             """
             cursor.execute(query)
