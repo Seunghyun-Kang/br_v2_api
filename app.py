@@ -294,8 +294,7 @@ def get_latest_data():
             cursor.execute(column_query)
             columns = cursor.fetchall()
             signal_columns = [row['COLUMN_NAME'] for row in columns]
-            logging.info(f"❌ 검색 칼럼: {columns}")
-            print(f"❌ 검색 칼럼: {columns}")
+            logging.info(f"❌칼럼명 결과: {signal_columns}")
             if not signal_columns:
                 return jsonify({"error": "No 'signal' columns found"}), 404
 
@@ -312,6 +311,7 @@ def get_latest_data():
             """
             cursor.execute(query)
             records = cursor.fetchall()
+            logging.info(f"❌최종 결과: {records}")
             cursor.close()
 
             # 데이터를 Redis 캐시에 저장 (300초 유효)
