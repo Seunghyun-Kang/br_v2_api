@@ -43,7 +43,8 @@ except (FileNotFoundError, json.JSONDecodeError):
 # ✅ Redis 연결
 # ----------------------------
 try:
-    redis_client = redis.StrictRedis(host='localhost', port=6379, decode_responses=True)
+    redis_client = redis.StrictRedis(
+        host='localhost', port=6379, decode_responses=True)
 except redis.ConnectionError:
     logger.error("Redis 연결 실패.")
     exit(1)
@@ -51,6 +52,8 @@ except redis.ConnectionError:
 # ----------------------------
 # ✅ MySQL 연결을 컨텍스트 매니저로 개선 (이걸 load_table_data()보다 먼저 정의해야 함!)
 # ----------------------------
+
+
 @contextmanager
 def get_mysql_connection():
     """MySQL 연결을 생성하고 자동으로 닫아주는 컨텍스트 매니저"""
@@ -79,6 +82,7 @@ def get_mysql_connection():
 # ----------------------------
 table_data = {}
 
+
 def load_table_data():
     global table_data  # 전역 변수에 저장
     table_names = ['krx_codes', 'usx_codes', 'coin_codes']
@@ -91,7 +95,8 @@ def load_table_data():
         try:
             cursor = conn.cursor()
             for table in table_names:
-                cursor.execute(f"SELECT code, name, market, sector FROM {table}")
+                cursor.execute(
+                    f"SELECT code, name, market, sector FROM {table}")
                 new_table_data[table] = cursor.fetchall()
             logger.info("✅ 테이블 데이터 로드 완료.")
         except pymysql.MySQLError as e:
@@ -103,12 +108,15 @@ def load_table_data():
 
 # ✅ 티커를 포함하는 테이블 찾기
 # ----------------------------
+
+
 def find_prices_table_with_ticker(ticker):
     for table_name, rows in table_data.items():
         if any(row.get('code') == ticker for row in rows):
             logger.info(f"✅ {ticker}가 포함된 테이블: {table_name}")
             return table_name.replace("_codes", "_prices")
     return None
+
 
 def find_signals_table_with_ticker(ticker):
     for table_name, rows in table_data.items():
@@ -125,6 +133,8 @@ def find_signals_table_with_ticker(ticker):
 # ----------------------------
 # ✅ 3시간마다 테이블 데이터 자동 업데이트
 # ----------------------------
+
+
 def periodic_table_update():
     while True:
         logger.info("⏳ 3시간마다 테이블 데이터 업데이트 실행 중...")
@@ -134,6 +144,8 @@ def periodic_table_update():
 # ----------------------------
 # ✅ 테이블 데이터 업데이트 API
 # ----------------------------
+
+
 @app.route('/update-tables', methods=['POST'])
 def update_table_data():
     try:
@@ -147,6 +159,8 @@ def update_table_data():
 # ----------------------------
 # ✅ 데이터 내 Decimal과 datetime 값을 JSON 직렬화 가능하도록 변환
 # ----------------------------
+
+
 def convert_to_serializable(data):
     if isinstance(data, list):  # 리스트 처리
         return [convert_to_serializable(item) for item in data]
@@ -175,6 +189,8 @@ def get_tables():
 # ----------------------------
 # ✅ 가격 정보 조회 API
 # ----------------------------
+
+
 @app.route('/prices', methods=['GET'])
 def get_data():
     ticker = request.args.get('ticker')
@@ -231,6 +247,7 @@ def get_data():
         logger.error(f"❌ 데이터 조회 중 예상치 못한 오류 발생: {e}")
         return jsonify({"error": str(e)}), 500
 
+
 @app.route('/latest_signals', methods=['GET'])
 def get_latest_data():
     market_type = request.args.get('type')
@@ -259,6 +276,22 @@ def get_latest_data():
         SELECT * 
         FROM {table_name}
         WHERE date = (SELECT MAX(date) FROM {table_name})
+        AND (
+            SELECT COUNT(*)
+            FROM information_schema.columns
+            WHERE table_name = '{table_name}'
+            AND column_name LIKE '%signal%'
+        ) >= 3
+        AND (
+            SELECT COUNT(*) 
+            FROM (SELECT * FROM {table_name} WHERE date = (SELECT MAX(date) FROM {table_name})) AS sub
+            WHERE 
+                (column1 = 1 OR column1 = -1) +
+                (column2 = 1 OR column2 = -1) +
+                (column3 = 1 OR column3 = -1) + 
+                ...  -- 여기에 모든 'signal' 관련 컬럼 추가
+            >= 3
+        )
         ORDER BY date ASC;
     """
 
@@ -286,6 +319,7 @@ def get_latest_data():
     except Exception as e:
         logger.error(f"❌ 데이터 조회 중 예상치 못한 오류 발생: {e}")
         return jsonify({"error": str(e)}), 500
+
 
 @app.route('/signals', methods=['GET'])
 def get_signals_by_ticker():
