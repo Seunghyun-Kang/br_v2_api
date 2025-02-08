@@ -254,7 +254,7 @@ def get_latest_data():
     if not market_type:
         return jsonify({"error": "Missing required parameter: market_type"}), 400
 
-    table_name = None
+    # 테이블명 설정
     if 'krx' in market_type:
         table_name = 'krx_signals'
     elif 'usx' in market_type:
@@ -262,33 +262,41 @@ def get_latest_data():
     else:
         table_name = 'coin_signals'
 
+    # Redis 캐시 확인
     cache_key = f"signals:{market_type}"
     cached_data = redis_client.get(cache_key)
-    try:
-        if cached_data:
-            cached_data = json.loads(cached_data)
-            logger.info("🚀 Redis 캐시에서 최신 데이터 불러오기 성공")
-            return jsonify(cached_data)
-    except Exception as e:
-        logger.error(f"❌ 캐시 조회 중 오류 발생: {e}")
+    if cached_data:
+        try:
+            logging.info("🚀 Redis 캐시에서 최신 데이터 불러오기 성공")
+            return jsonify(json.loads(cached_data))
+        except Exception as e:
+            logging.error(f"❌ Redis 캐시 변환 오류: {e}")
+
+    # MySQL 연결
+    conn = get_mysql_connection()
+    if not conn:
+        return jsonify({"error": "Failed to connect to MySQL"}), 500
 
     try:
-        column_query = f"""
-            SELECT COLUMN_NAME
-            FROM INFORMATION_SCHEMA.COLUMNS
-            WHERE TABLE_SCHEMA = 'your_database' 
-            AND TABLE_NAME = '{table_name}'
-            AND COLUMN_NAME LIKE '%signal%'
-        """
-        with get_mysql_connection() as conn:
-            if not conn:
-                return jsonify({"error": "Failed to connect to MySQL"}), 500
-
-            cursor = conn.cursor()
+        with conn.cursor() as cursor:
+            # 'signal'이 포함된 컬럼명 조회
+            column_query = f"""
+                SELECT COLUMN_NAME
+                FROM INFORMATION_SCHEMA.COLUMNS
+                WHERE TABLE_SCHEMA = 'your_database' 
+                AND TABLE_NAME = '{table_name}'
+                AND COLUMN_NAME LIKE '%signal%'
+            """
             cursor.execute(column_query)
-            signal_columns = [row[0] for row in cursor.fetchall()]
+            signal_columns = [row['COLUMN_NAME'] for row in cursor.fetchall()]
+
+            if not signal_columns:
+                return jsonify({"error": "No 'signal' columns found"}), 404
+
+            # 조건문 생성
             condition = " + ".join([f"({col} = 1 OR {col} = -1)" for col in signal_columns])
 
+            # 최신 데이터 조회 쿼리
             query = f"""
                 SELECT * 
                 FROM {table_name}
@@ -296,26 +304,29 @@ def get_latest_data():
                 AND ({condition}) >= 3
                 ORDER BY date ASC;
             """
-            cursor = conn.cursor()
             cursor.execute(query)
             records = cursor.fetchall()
-            cursor.close()
 
             if not records:
                 return jsonify({"error": f"No data found for type {market_type}"}), 404
 
+            # 데이터를 Redis 캐시에 저장 (300초 유효)
             records = convert_to_serializable(records)
             redis_client.setex(cache_key, 300, json.dumps(records))
-            logger.info("🚀 DB에서 최신 데이터 불러오기 성공")
+
+            logging.info("🚀 DB에서 최신 데이터 불러오기 성공")
             return jsonify(records)
 
     except pymysql.MySQLError as e:
-        logger.error(f"❌ MySQL 쿼리 실행 중 오류 발생: {e}")
+        logging.error(f"❌ MySQL 쿼리 실행 중 오류 발생: {e}")
         return jsonify({"error": f"MySQL Error: {str(e)}"}), 500
+
     except Exception as e:
-        logger.error(f"❌ 데이터 조회 중 예상치 못한 오류 발생: {e}")
+        logging.error(f"❌ 데이터 조회 중 예상치 못한 오류 발생: {e}")
         return jsonify({"error": str(e)}), 500
 
+    finally:
+        conn.close()  # 항상 MySQL 연결 종료
 
 @app.route('/signals', methods=['GET'])
 def get_signals_by_ticker():
