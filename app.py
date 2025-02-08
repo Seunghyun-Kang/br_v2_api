@@ -304,21 +304,17 @@ def get_latest_data():
                 SELECT * 
                 FROM {table_name}
                 WHERE date = (SELECT MAX(date) FROM {table_name})
-                AND ({condition}) >= 3
+                AND ({condition}) >= 2
                 ORDER BY date ASC;
             """
             cursor.execute(query)
             records = cursor.fetchall()
             cursor.close()
 
-            if not records:
-                return jsonify({"error": f"No data found for type {market_type}"}), 404
-
             # 데이터를 Redis 캐시에 저장 (300초 유효)
             records = convert_to_serializable(records)
             redis_client.setex(cache_key, 300, json.dumps(records))
 
-            logging.info("🚀 DB에서 최신 데이터 불러오기 성공")
             return jsonify(records)
 
     except pymysql.MySQLError as e:
