@@ -278,7 +278,9 @@ def get_latest_data():
         return jsonify({"error": "Failed to connect to MySQL"}), 500
 
     try:
-        with conn.cursor() as cursor:
+        with get_mysql_connection() as conn:
+            if not conn:
+                return jsonify({"error": "Failed to connect to MySQL"}), 500
             # 'signal'이 포함된 컬럼명 조회
             column_query = f"""
                 SELECT COLUMN_NAME
@@ -287,6 +289,7 @@ def get_latest_data():
                 AND TABLE_NAME = '{table_name}'
                 AND COLUMN_NAME LIKE '%signal%'
             """
+            cursor = conn.cursor()
             cursor.execute(column_query)
             signal_columns = [row['COLUMN_NAME'] for row in cursor.fetchall()]
 
