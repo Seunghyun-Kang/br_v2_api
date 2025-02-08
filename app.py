@@ -284,7 +284,6 @@ def get_latest_data():
             cursor = conn.cursor()
             cursor.execute(column_query)
             signal_columns = [row[0] for row in cursor.fetchall()]
-            cursor.close()
             condition = " + ".join([f"({col} = 1 OR {col} = -1)" for col in signal_columns])
 
             query = f"""
@@ -294,10 +293,6 @@ def get_latest_data():
                 AND ({condition}) >= 3
                 ORDER BY date ASC;
             """
-        with get_mysql_connection() as conn:
-            if not conn:
-                return jsonify({"error": "Failed to connect to MySQL"}), 500
-
             cursor = conn.cursor()
             cursor.execute(query)
             records = cursor.fetchall()
