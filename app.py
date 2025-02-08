@@ -272,11 +272,11 @@ def get_latest_data():
     except Exception as e:
         logger.error(f"❌ 캐시 조회 중 오류 발생: {e}")
 
-    column_query = f"""
-        SELECT name FROM PRAGMA_TABLE_INFO('{table_name}')
-        WHERE name LIKE '%signal%'
-    """
-    try:
+    try
+        column_query = f"""
+            SELECT name FROM PRAGMA_TABLE_INFO('{table_name}')
+            WHERE name LIKE '%signal%'
+        """
         with get_mysql_connection() as conn:
             if not conn:
                 return jsonify({"error": "Failed to connect to MySQL"}), 500
@@ -287,21 +287,36 @@ def get_latest_data():
             cursor.close()
             condition = " + ".join([f"({col} = 1 OR {col} = -1)" for col in signal_columns])
 
+        query = f"""
+            SELECT * 
+            FROM {table_name}
+            WHERE date = (SELECT MAX(date) FROM {table_name})
+            AND ({condition}) >= 3
+            ORDER BY date ASC;
+        """
+        with get_mysql_connection() as conn:
+            if not conn:
+                return jsonify({"error": "Failed to connect to MySQL"}), 500
+
+            cursor = conn.cursor()
+            cursor.execute(query)
+            records = cursor.fetchall()
+            cursor.close()
+
+        if not records:
+            return jsonify({"error": f"No data found for type {market_type}"}), 404
+
+        records = convert_to_serializable(records)
+        redis_client.setex(cache_key, 300, json.dumps(records))
+        logger.info("🚀 DB에서 최신 데이터 불러오기 성공")
+        return jsonify(records)
+
     except pymysql.MySQLError as e:
         logger.error(f"❌ MySQL 쿼리 실행 중 오류 발생: {e}")
         return jsonify({"error": f"MySQL Error: {str(e)}"}), 500
     except Exception as e:
         logger.error(f"❌ 데이터 조회 중 예상치 못한 오류 발생: {e}")
         return jsonify({"error": str(e)}), 500
-
-    # 최종 쿼리 생성
-    query = f"""
-        SELECT * 
-        FROM {table_name}
-        WHERE date = (SELECT MAX(date) FROM {table_name})
-        AND ({condition}) >= 3
-        ORDER BY date ASC;
-    """
 
     try:
         with get_mysql_connection() as conn:
