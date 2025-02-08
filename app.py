@@ -298,38 +298,13 @@ def get_latest_data():
             records = cursor.fetchall()
             cursor.close()
 
-        if not records:
-            return jsonify({"error": f"No data found for type {market_type}"}), 404
+            if not records:
+                return jsonify({"error": f"No data found for type {market_type}"}), 404
 
-        records = convert_to_serializable(records)
-        redis_client.setex(cache_key, 300, json.dumps(records))
-        logger.info("🚀 DB에서 최신 데이터 불러오기 성공")
-        return jsonify(records)
-
-    except pymysql.MySQLError as e:
-        logger.error(f"❌ MySQL 쿼리 실행 중 오류 발생: {e}")
-        return jsonify({"error": f"MySQL Error: {str(e)}"}), 500
-    except Exception as e:
-        logger.error(f"❌ 데이터 조회 중 예상치 못한 오류 발생: {e}")
-        return jsonify({"error": str(e)}), 500
-
-    try:
-        with get_mysql_connection() as conn:
-            if not conn:
-                return jsonify({"error": "Failed to connect to MySQL"}), 500
-
-            cursor = conn.cursor()
-            cursor.execute(query)
-            records = cursor.fetchall()
-            cursor.close()
-
-        if not records:
-            return jsonify({"error": f"No data found for type {market_type}"}), 404
-
-        records = convert_to_serializable(records)
-        redis_client.setex(cache_key, 300, json.dumps(records))
-        logger.info("🚀 DB에서 최신 데이터 불러오기 성공")
-        return jsonify(records)
+            records = convert_to_serializable(records)
+            redis_client.setex(cache_key, 300, json.dumps(records))
+            logger.info("🚀 DB에서 최신 데이터 불러오기 성공")
+            return jsonify(records)
 
     except pymysql.MySQLError as e:
         logger.error(f"❌ MySQL 쿼리 실행 중 오류 발생: {e}")
@@ -337,7 +312,7 @@ def get_latest_data():
     except Exception as e:
         logger.error(f"❌ 데이터 조회 중 예상치 못한 오류 발생: {e}")
         return jsonify({"error": str(e)}), 500
-
+        
 
 @app.route('/signals', methods=['GET'])
 def get_signals_by_ticker():
