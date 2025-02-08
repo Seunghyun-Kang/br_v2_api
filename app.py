@@ -276,13 +276,23 @@ def get_latest_data():
         SELECT name FROM PRAGMA_TABLE_INFO('{table_name}')
         WHERE name LIKE '%signal%'
     """
+    try:
+        with get_mysql_connection() as conn:
+            if not conn:
+                return jsonify({"error": "Failed to connect to MySQL"}), 500
 
-    # 컬럼명 리스트 가져오기
-    cursor.execute(column_query)
-    signal_columns = [row[0] for row in cursor.fetchall()]
+            cursor = conn.cursor()
+            cursor.execute(column_query)
+            signal_columns = [row[0] for row in cursor.fetchall()]
+            cursor.close()
+            condition = " + ".join([f"({col} = 1 OR {col} = -1)" for col in signal_columns])
 
-    # SQL 조건문 동적 생성 (각 컬럼 값이 1 또는 -1인 개수 계산)
-    condition = " + ".join([f"({col} = 1 OR {col} = -1)" for col in signal_columns])
+    except pymysql.MySQLError as e:
+        logger.error(f"❌ MySQL 쿼리 실행 중 오류 발생: {e}")
+        return jsonify({"error": f"MySQL Error: {str(e)}"}), 500
+    except Exception as e:
+        logger.error(f"❌ 데이터 조회 중 예상치 못한 오류 발생: {e}")
+        return jsonify({"error": str(e)}), 500
 
     # 최종 쿼리 생성
     query = f"""
