@@ -272,7 +272,7 @@ def get_latest_data():
     except Exception as e:
         logger.error(f"❌ 캐시 조회 중 오류 발생: {e}")
 
-    try
+    try:
         column_query = f"""
             SELECT name FROM PRAGMA_TABLE_INFO('{table_name}')
             WHERE name LIKE '%signal%'
