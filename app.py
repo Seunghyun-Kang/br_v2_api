@@ -299,7 +299,7 @@ def get_latest_data():
                 return jsonify({"error": "No 'signal' columns found"}), 404
 
             # 조건문 생성
-            buy_condition = " + ".join([f"({col} = 1" for col in signal_columns])
+            buy_condition = " + ".join([f"({col} = 1)" for col in signal_columns])
 
             # 최신 데이터 조회 쿼리
             query = f"""
@@ -313,7 +313,7 @@ def get_latest_data():
             buy_records = cursor.fetchall()
 
             # 조건문 생성
-            sell_condition = " + ".join([f"({col} = -1" for col in signal_columns])
+            sell_condition = " + ".join([f"({col} = -1)" for col in signal_columns])
 
             # 최신 데이터 조회 쿼리
             query = f"""
@@ -328,16 +328,14 @@ def get_latest_data():
             cursor.close()
 
             final = {
-                "buy": buy_records,
-                "sell": sell_records
+                "buy": convert_to_serializable(buy_records),
+                "sell": convert_to_serializable(sell_records)
             }
-
-            print(f"❌최종 결과: {final}")
-            # 데이터를 Redis 캐시에 저장 (300초 유효)
-            final = convert_to_serializable(final)
+            print(f"❌최종 결과: {final}")  # 변환 후 출력
             redis_client.setex(cache_key, 300, json.dumps(final))
 
             return jsonify(final)
+
 
     except pymysql.MySQLError as e:
         logging.error(f"❌ MySQL 쿼리 실행 중 오류 발생: {e}")
