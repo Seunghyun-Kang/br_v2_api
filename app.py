@@ -299,26 +299,45 @@ def get_latest_data():
                 return jsonify({"error": "No 'signal' columns found"}), 404
 
             # 조건문 생성
-            condition = " + ".join([f"({col} = 1 OR {col} = -1)" for col in signal_columns])
+            buy_condition = " + ".join([f"({col} = 1" for col in signal_columns])
 
             # 최신 데이터 조회 쿼리
             query = f"""
                 SELECT * 
                 FROM {table_name}
                 WHERE date = (SELECT MAX(date) FROM {table_name})
-                AND ({condition}) >= 2
+                AND ({buy_condition}) >= 2
                 ORDER BY date ASC;
             """
             cursor.execute(query)
-            records = cursor.fetchall()
-            print(f"❌최종 결과: {records}")
+            buy_records = cursor.fetchall()
+
+            # 조건문 생성
+            sell_condition = " + ".join([f"({col} = -1" for col in signal_columns])
+
+            # 최신 데이터 조회 쿼리
+            query = f"""
+                SELECT * 
+                FROM {table_name}
+                WHERE date = (SELECT MAX(date) FROM {table_name})
+                AND ({sell_condition}) >= 2
+                ORDER BY date ASC;
+            """
+            cursor.execute(query)
+            sell_records = cursor.fetchall()
             cursor.close()
 
-            # 데이터를 Redis 캐시에 저장 (300초 유효)
-            records = convert_to_serializable(records)
-            redis_client.setex(cache_key, 300, json.dumps(records))
+            final = {
+                "buy": buy_records,
+                "sell": sell_records
+            }
 
-            return jsonify(records)
+            print(f"❌최종 결과: {final}")
+            # 데이터를 Redis 캐시에 저장 (300초 유효)
+            final = convert_to_serializable(final)
+            redis_client.setex(cache_key, 300, json.dumps(final))
+
+            return jsonify(final)
 
     except pymysql.MySQLError as e:
         logging.error(f"❌ MySQL 쿼리 실행 중 오류 발생: {e}")
