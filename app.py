@@ -274,8 +274,11 @@ def get_latest_data():
 
     try:
         column_query = f"""
-            SELECT name FROM PRAGMA_TABLE_INFO('{table_name}')
-            WHERE name LIKE '%signal%'
+            SELECT COLUMN_NAME
+            FROM INFORMATION_SCHEMA.COLUMNS
+            WHERE TABLE_SCHEMA = 'your_database' 
+            AND TABLE_NAME = '{table_name}'
+            AND COLUMN_NAME LIKE '%signal%'
         """
         with get_mysql_connection() as conn:
             if not conn:
@@ -312,7 +315,7 @@ def get_latest_data():
     except Exception as e:
         logger.error(f"❌ 데이터 조회 중 예상치 못한 오류 발생: {e}")
         return jsonify({"error": str(e)}), 500
-        
+
 
 @app.route('/signals', methods=['GET'])
 def get_signals_by_ticker():
