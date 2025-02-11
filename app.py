@@ -11,6 +11,9 @@ from datetime import datetime, date
 from contextlib import contextmanager
 import decimal
 from flask_cors import CORS
+import exchange_calendars as ecals
+import datetime
+import pandas as pd
 # ----------------------------
 # ✅ Logging 설정 (print() 대신 사용)
 # ----------------------------
@@ -247,6 +250,26 @@ def get_data():
         logger.error(f"❌ 데이터 조회 중 예상치 못한 오류 발생: {e}")
         return jsonify({"error": str(e)}), 500
 
+def get_next_market_date(market_type):
+
+    if 'krx' in market_type:
+        calendar_type = 'XKRX'
+    elif 'usx' in market_type:
+        calendar_type = 'XNYS'
+    else:
+        calendar_type = 'COINS'
+        
+    krx = ecals.get_calendar(calendar_type)
+    today = pd.Timestamp.today().normalize()
+    schedule = krx.schedule(start_date=today, end_date=today + pd.Timedelta(days=10))
+
+    # 오늘 이후(오늘 포함) 첫 거래일 찾기
+    i = schedule.index.searchsorted(today)
+    if i < len(schedule.index):
+        next_session = schedule.index[i]
+        return next_session.strftime("%Y-%m-%d")
+    else: 
+        return None
 
 @app.route('/latest_signals', methods=['GET'])
 def get_latest_data():
@@ -272,6 +295,9 @@ def get_latest_data():
             return jsonify(json.loads(cached_data))
         except Exception as e:
             logging.error(f"❌ Redis 캐시 변환 오류: {e}")
+
+    today = datetime.date.today().strftime("%Y-%m-%d")
+    next_market_date = get_next_market_date(market_type)
 
     # MySQL 연결
     conn = get_mysql_connection()
@@ -305,7 +331,7 @@ def get_latest_data():
             query = f"""
                 SELECT * 
                 FROM {table_name}
-                WHERE date = (SELECT MAX(date) FROM {table_name})
+                WHERE date = '{today}'
                 AND ({buy_condition}) >= 3
                 ORDER BY date ASC;
             """
@@ -319,7 +345,7 @@ def get_latest_data():
             query = f"""
                 SELECT * 
                 FROM {table_name}
-                WHERE date = (SELECT MAX(date) FROM {table_name})
+                WHERE date = '{today}'
                 AND ({sell_condition}) >= 3
                 ORDER BY date ASC;
             """
@@ -328,6 +354,8 @@ def get_latest_data():
             cursor.close()
 
             final = {
+                "today": today,
+                "next": next_market_date,
                 "buy": convert_to_serializable(buy_records),
                 "sell": convert_to_serializable(sell_records)
             }
