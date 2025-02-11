@@ -288,7 +288,7 @@ def get_latest_data():
             logging.error(f"❌ Redis 캐시 변환 오류: {e}")
 
     today = datetime.now().strftime('%Y-%m-%d')
-    next_market_date = get_next_market_date(market_type).to_pydatetime().date()
+    next_market_date = get_next_market_date(market_type).strftime("%Y-%m-%d")
 
     # MySQL 연결
     conn = get_mysql_connection()
