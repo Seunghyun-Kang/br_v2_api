@@ -258,19 +258,10 @@ def get_next_market_date(market_type):
     else:
         calendar_type = 'COINS'
         
-    krx = ecals.get_calendar(calendar_type)
+    market_calendar = ecals.get_calendar(calendar_type)
     today = datetime.now().strftime('%Y-%m-%d')
-    future_date = (datetime.now() + timedelta(days=14)).strftime('%Y-%m-%d')
-    schedule = krx.schedule(start_date=today, end_date=future_date)
-
-    # 오늘 이후(오늘 포함) 첫 거래일 찾기
-    i = schedule.index.searchsorted(today)
-    if i < len(schedule.index):
-        next_session = schedule.index[i]
-        return next_session.strftime("%Y-%m-%d")
-    else: 
-        return None
-
+    return market_calendar.next_open(datetime.now()).to_pydatetime().date()
+    
 @app.route('/latest_signals', methods=['GET'])
 def get_latest_data():
     market_type = request.args.get('type')
