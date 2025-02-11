@@ -12,7 +12,6 @@ from contextlib import contextmanager
 import decimal
 from flask_cors import CORS
 import exchange_calendars as ecals
-import datetime
 import pandas as pd
 # ----------------------------
 # ✅ Logging 설정 (print() 대신 사용)
@@ -296,7 +295,7 @@ def get_latest_data():
         except Exception as e:
             logging.error(f"❌ Redis 캐시 변환 오류: {e}")
 
-    today = datetime.date.today().strftime("%Y-%m-%d")
+    today = datetime.now().strftime('%Y-%m-%d')
     next_market_date = get_next_market_date(market_type)
 
     # MySQL 연결
