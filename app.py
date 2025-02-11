@@ -7,7 +7,7 @@ import redis
 import threading
 import time
 from flask import Flask, jsonify, request
-from datetime import datetime, date
+from datetime import datetime, date, timedelta
 from contextlib import contextmanager
 import decimal
 from flask_cors import CORS
@@ -259,8 +259,9 @@ def get_next_market_date(market_type):
         calendar_type = 'COINS'
         
     krx = ecals.get_calendar(calendar_type)
-    today = pd.Timestamp.today().normalize()
-    schedule = krx.schedule(start_date=today, end_date=today + pd.Timedelta(days=10))
+    today = datetime.now().strftime('%Y-%m-%d')
+    future_date = (datetime.now() + timedelta(days=14)).strftime('%Y-%m-%d')
+    schedule = krx.schedule(start_date=today, end_date=future_date)
 
     # 오늘 이후(오늘 포함) 첫 거래일 찾기
     i = schedule.index.searchsorted(today)
