@@ -331,8 +331,8 @@ def get_latest_data():
             cursor.close()
 
             # Python에서 필터링
-            buy_records = [row for row in rows if row['buy_sum'] >= 3]
-            sell_records = [row for row in rows if row['sell_sum'] >= 3]
+            buy_records = [row for row in rows if row['buy_sum'] >= 4]
+            sell_records = [row for row in rows if row['sell_sum'] >= 4]
 
             final = {
                 "today": today,
@@ -340,7 +340,6 @@ def get_latest_data():
                 "buy": convert_to_serializable(buy_records),
                 "sell": convert_to_serializable(sell_records)
             }
-            print(f"❌최종 결과: {final}")  # 변환 후 출력
             redis_client.setex(cache_key, 300, json.dumps(final))
 
             return jsonify(final)
