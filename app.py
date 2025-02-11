@@ -316,33 +316,23 @@ def get_latest_data():
                 return jsonify({"error": "No 'signal' columns found"}), 404
 
             # 조건문 생성
-            buy_condition = " + ".join([f"({col} = 1)" for col in signal_columns])
+            signal_buy = " + ".join([f"(CASE WHEN {col} = 1 THEN 1 ELSE 0 END)" for col in signal_columns])
+            signal_sell = " + ".join([f"(CASE WHEN {col} = -1 THEN 1 ELSE 0 END)" for col in signal_columns])
 
-            # 최신 데이터 조회 쿼리
             query = f"""
-                SELECT * 
+                SELECT *,
+                    ({signal_buy}) AS buy_sum,
+                    ({signal_sell}) AS sell_sum
                 FROM {table_name}
                 WHERE date = '{today}'
-                AND ({buy_condition}) >= 3
-                ORDER BY date ASC;
             """
             cursor.execute(query)
-            buy_records = cursor.fetchall()
-
-            # 조건문 생성
-            sell_condition = " + ".join([f"({col} = -1)" for col in signal_columns])
-
-            # 최신 데이터 조회 쿼리
-            query = f"""
-                SELECT * 
-                FROM {table_name}
-                WHERE date = '{today}'
-                AND ({sell_condition}) >= 3
-                ORDER BY date ASC;
-            """
-            cursor.execute(query)
-            sell_records = cursor.fetchall()
+            rows = cursor.fetchall()
             cursor.close()
+
+            # Python에서 필터링
+            buy_records = [row for row in rows if row['buy_sum'] >= 3]
+            sell_records = [row for row in rows if row['sell_sum'] >= 3]
 
             final = {
                 "today": today,
