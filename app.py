@@ -251,7 +251,7 @@ def get_data():
 # ✅ 가격 정보 조회 API
 # ----------------------------
 @app.route('/latest_prices', methods=['GET'])
-def get_latest_data():
+def get_latest_price_data():
     ticker = request.args.get('ticker')
 
     if not ticker:
