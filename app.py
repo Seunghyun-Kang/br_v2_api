@@ -191,8 +191,6 @@ def get_tables():
 # ----------------------------
 # ✅ 가격 정보 조회 API
 # ----------------------------
-
-
 @app.route('/prices', methods=['GET'])
 def get_data():
     ticker = request.args.get('ticker')
@@ -248,6 +246,67 @@ def get_data():
     except Exception as e:
         logger.error(f"❌ 데이터 조회 중 예상치 못한 오류 발생: {e}")
         return jsonify({"error": str(e)}), 500
+
+# ----------------------------
+# ✅ 가격 정보 조회 API
+# ----------------------------
+@app.route('/latest_prices', methods=['GET'])
+def get_latest_data():
+    ticker = request.args.get('ticker')
+
+    if not ticker:
+        return jsonify({"error": "Missing required parameter: ticker"}), 400
+
+    table_name = find_prices_table_with_ticker(ticker)
+    if not table_name:
+        return jsonify({"error": f"Ticker {ticker} not found in any table"}), 404
+
+    cache_key = f"latest_prices:{ticker}"
+    cached_data = redis_client.get(cache_key)
+
+    try:
+        if cached_data:
+            cached_data = json.loads(cached_data)
+            logger.info("🚀 redis에서 불러오기 성공")
+            return jsonify(cached_data)
+    except Exception as e:
+        logger.error(f"❌ 데이터 조회 중 예상치 못한 오류 발생: {e}")
+
+    query = f"""
+        SELECT code, date, close
+        FROM {table_name}
+        WHERE code = %s 
+        ORDER BY date ASC
+        LIMIT 1;
+    """
+
+    try:
+        with get_mysql_connection() as conn:
+            if not conn:  # MySQL 연결 실패 처리
+                return jsonify({"error": "Failed to connect to MySQL"}), 500
+
+            cursor = conn.cursor()
+            cursor.execute(query, (ticker,))
+            records = cursor.fetchall()
+            cursor.close()
+
+        if not records:
+            return jsonify({"error": f"No data found for ticker {ticker}"}), 404
+
+        # ✅ Decimal 값을 float으로 변환
+        records = convert_to_serializable(records)
+        # Redis에 데이터 캐싱
+        redis_client.setex(cache_key, 300, json.dumps(records))
+        logger.info("🚀 DB에서 불러오기 성공")
+        return jsonify({"code": ticker, "data": records})
+
+    except pymysql.MySQLError as e:
+        logger.error(f"❌ MySQL 쿼리 실행 중 오류 발생: {e}")
+        return jsonify({"error": f"MySQL Error: {str(e)}"}), 500
+    except Exception as e:
+        logger.error(f"❌ 데이터 조회 중 예상치 못한 오류 발생: {e}")
+        return jsonify({"error": str(e)}), 500
+
 
 def get_next_market_date(market_type):
 
