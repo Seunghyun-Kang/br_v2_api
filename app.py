@@ -412,6 +412,7 @@ def get_signals_by_ticker():
 @app.route('/trade_history', methods=['GET'])
 def get_trade_history():
     market_type = request.args.get('type')
+    signal_type = request.args.get('signal_type')
     start_date = request.args.get('start_date')
     end_date = request.args.get('end_date')
 
@@ -425,13 +426,13 @@ def get_trade_history():
         end_date = datetime.now().strftime('%Y-%m-%d')
 
     if 'krx' in market_type:
-        table_name = 'krx_trades'
+        table_name = f'krx_trades_{signal_type}'
     elif 'usx' in market_type:
-        table_name = 'usx_trades'
+        table_name = f'usx_trades_{signal_type}'
     else:
-        table_name = 'coin_trades'
+        table_name = f'coin_trades_{signal_type}'
 
-    cache_key = f"trade_history:{market_type}:{start_date}:{end_date}"
+    cache_key = f"trade_history:{market_type}:{signal_type}:{start_date}:{end_date}"
     cached_data = redis_client.get(cache_key)
 
     try:
@@ -481,18 +482,19 @@ def get_trade_history():
 @app.route('/owned', methods=['GET'])
 def get_owned():
     market_type = request.args.get('type')
+    signal_type = request.args.get('signal_type')
 
     if not market_type:
         return jsonify({"error": "Missing required parameter: market_type"}), 400
 
     if 'krx' in market_type:
-        table_name = 'krx_owned'
+        table_name = f'krx_owned_{signal_type}'
     elif 'usx' in market_type:
-        table_name = 'usx_owned'
+        table_name = f'usx_owned_{signal_type}'
     else:
-        table_name = 'coin_owned'
+        table_name = f'coin_owned_{signal_type}'
 
-    cache_key = f"owned"
+    cache_key = f"owned:{market_type}:{signal_type}"
     cached_data = redis_client.get(cache_key)
 
     try:
