@@ -383,6 +383,7 @@ def get_next_market_date(market_type):
 def get_latest_data():
     market_type = request.args.get('type')
     signal_type = request.args.get('signal_type')
+    latest_date = request.args.get('latest_date')
 
     if not market_type:
         return jsonify({"error": "Missing required parameter: market_type"}), 400
@@ -423,7 +424,7 @@ def get_latest_data():
                 query = f"""
                     SELECT *
                     FROM {table_name}
-                    WHERE target_date = '{next_market_date}' AND ideal_signal = 1
+                    WHERE target_date = '{next_market_date}' AND date = '{latest_date}' AND ideal_signal = 1
                 """
                 cursor = conn.cursor()
                 cursor.execute(query)
@@ -432,7 +433,7 @@ def get_latest_data():
                 query = f"""
                     SELECT *
                     FROM {table_name}
-                    WHERE target_date = '{next_market_date}' AND ideal_signal = -1
+                    WHERE target_date = '{next_market_date}' AND date = '{latest_date}' AND ideal_signal = -1
                 """
                 cursor.execute(query)
                 sell_records = cursor.fetchall()
