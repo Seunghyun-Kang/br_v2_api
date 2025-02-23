@@ -483,17 +483,10 @@ def get_trade_history():
 def get_profits():
     market_type = request.args.get('type')
     signal_type = request.args.get('signal_type')
-    start_date = request.args.get('start_date')
-    end_date = request.args.get('end_date')
+    uid = request.args.get('uid')
 
     if not market_type:
         return jsonify({"error": "Missing required parameter: market_type"}), 400
-
-    if not start_date:
-        start_date = datetime.now().strftime('%Y-%m-%d')
-
-    if not end_date:
-        end_date = datetime.now().strftime('%Y-%m-%d')
 
     if 'krx' in market_type:
         table_name = f'krx_trades_{signal_type}'
@@ -502,7 +495,7 @@ def get_profits():
     else:
         table_name = f'coin_trades_{signal_type}'
 
-    cache_key = f"profits:{market_type}:{signal_type}:{start_date}:{end_date}"
+    cache_key = f"profits:{market_type}:{signal_type}"
     cached_data = redis_client.get(cache_key)
 
     try:
@@ -516,7 +509,6 @@ def get_profits():
     query = f"""
         SELECT date, profit
         FROM {table_name}
-        WHERE date <= {end_date} AND date >= {start_date}
     """
 
     try:
