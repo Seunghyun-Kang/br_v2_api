@@ -477,6 +477,77 @@ def get_trade_history():
         return jsonify({"error": str(e)}), 500
 
 # ----------------------------
+# ✅ 매매 이력 API
+# ----------------------------
+@app.route('/profits', methods=['GET'])
+def get_profits():
+    market_type = request.args.get('type')
+    signal_type = request.args.get('signal_type')
+    start_date = request.args.get('start_date')
+    end_date = request.args.get('end_date')
+
+    if not market_type:
+        return jsonify({"error": "Missing required parameter: market_type"}), 400
+
+    if not start_date:
+        start_date = datetime.now().strftime('%Y-%m-%d')
+
+    if not end_date:
+        end_date = datetime.now().strftime('%Y-%m-%d')
+
+    if 'krx' in market_type:
+        table_name = f'krx_trades_{signal_type}'
+    elif 'usx' in market_type:
+        table_name = f'usx_trades_{signal_type}'
+    else:
+        table_name = f'coin_trades_{signal_type}'
+
+    cache_key = f"profits:{market_type}:{signal_type}:{start_date}:{end_date}"
+    cached_data = redis_client.get(cache_key)
+
+    try:
+        if cached_data:
+            cached_data = json.loads(cached_data)
+            logger.info("🚀 redis에서 불러오기 성공")
+            return jsonify(cached_data)
+    except Exception as e:
+        logger.error(f"❌ 데이터 조회 중 예상치 못한 오류 발생: {e}")
+
+    query = f"""
+        SELECT date, profit
+        FROM {table_name}
+        WHERE date <= {end_date} AND date >= {start_date}
+    """
+
+    try:
+        with get_mysql_connection() as conn:
+            if not conn:  # MySQL 연결 실패 처리
+                return jsonify({"error": "Failed to connect to MySQL"}), 500
+
+            cursor = conn.cursor()
+            cursor.execute(query)
+            records = cursor.fetchall()
+            cursor.close()
+
+        if not records:
+            return jsonify({"error": f"No data found for trade {market_type}"}), 404
+
+        # ✅ Decimal 값을 float으로 변환
+        records = convert_to_serializable(records)
+        # Redis에 데이터 캐싱
+        redis_client.setex(cache_key, 300, json.dumps(records))
+        logger.info("🚀 DB에서 불러오기 성공")
+        return jsonify(records)
+
+    except pymysql.MySQLError as e:
+        logger.error(f"❌ MySQL 쿼리 실행 중 오류 발생: {e}")
+        return jsonify({"error": f"MySQL Error: {str(e)}"}), 500
+    except Exception as e:
+        logger.error(f"❌ 데이터 조회 중 예상치 못한 오류 발생: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+# ----------------------------
 # ✅ 보유 종목 API
 # ----------------------------
 @app.route('/owned', methods=['GET'])
