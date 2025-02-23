@@ -250,8 +250,8 @@ def get_data():
 # ----------------------------
 # ✅ 가격 정보 조회 API
 # ----------------------------
-@app.route('/latest_prices', methods=['GET'])
-def get_latest_price_data():
+@app.route('/latest_prices_ticker', methods=['GET'])
+def get_latest_price_data1():
     ticker = request.args.get('ticker')
 
     if not ticker:
@@ -299,6 +299,65 @@ def get_latest_price_data():
         redis_client.setex(cache_key, 300, json.dumps(records))
         logger.info("🚀 DB에서 불러오기 성공")
         return jsonify({"code": ticker, "data": records})
+
+    except pymysql.MySQLError as e:
+        logger.error(f"❌ MySQL 쿼리 실행 중 오류 발생: {e}")
+        return jsonify({"error": f"MySQL Error: {str(e)}"}), 500
+    except Exception as e:
+        logger.error(f"❌ 데이터 조회 중 예상치 못한 오류 발생: {e}")
+        return jsonify({"error": str(e)}), 500
+
+# ----------------------------
+# ✅ 가격 정보 조회 API
+# ----------------------------
+@app.route('/latest_prices', methods=['GET'])
+def get_latest_price_data2():
+    market_type = request.args.get('market_type')
+    date = request.args.get('date')
+
+    if 'krx' in market_type:
+        table_name = 'krx_prices'
+    elif 'usx' in market_type:
+        table_name = 'usx_prices'
+    else:
+        table_name = 'coin_prices'
+
+    cache_key = f"latest_prices:{market_type}"
+    cached_data = redis_client.get(cache_key)
+
+    try:
+        if cached_data:
+            cached_data = json.loads(cached_data)
+            logger.info("🚀 redis에서 불러오기 성공")
+            return jsonify(cached_data)
+    except Exception as e:
+        logger.error(f"❌ 데이터 조회 중 예상치 못한 오류 발생: {e}")
+
+    query = f"""
+        SELECT code, date, close
+        FROM {table_name}
+        WHERE date = %s
+    """
+
+    try:
+        with get_mysql_connection() as conn:
+            if not conn:  # MySQL 연결 실패 처리
+                return jsonify({"error": "Failed to connect to MySQL"}), 500
+
+            cursor = conn.cursor()
+            cursor.execute(query, (date,))
+            records = cursor.fetchall()
+            cursor.close()
+
+        if not records:
+            return jsonify({"error": f"No data found"}), 404
+
+        # ✅ Decimal 값을 float으로 변환
+        records = convert_to_serializable(records)
+        # Redis에 데이터 캐싱
+        redis_client.setex(cache_key, 300, json.dumps(records))
+        logger.info("🚀 DB에서 불러오기 성공")
+        return jsonify(records)
 
     except pymysql.MySQLError as e:
         logger.error(f"❌ MySQL 쿼리 실행 중 오류 발생: {e}")
@@ -646,6 +705,70 @@ def get_owned():
 
         if not records:
             return jsonify({"error": f"No data found for owned {market_type}"}), 404
+
+        # ✅ Decimal 값을 float으로 변환
+        records = convert_to_serializable(records)
+        # Redis에 데이터 캐싱
+        redis_client.setex(cache_key, 300, json.dumps(records))
+        logger.info("🚀 DB에서 불러오기 성공")
+        return jsonify(records)
+
+    except pymysql.MySQLError as e:
+        logger.error(f"❌ MySQL 쿼리 실행 중 오류 발생: {e}")
+        return jsonify({"error": f"MySQL Error: {str(e)}"}), 500
+    except Exception as e:
+        logger.error(f"❌ 데이터 조회 중 예상치 못한 오류 발생: {e}")
+        return jsonify({"error": str(e)}), 500
+
+# ----------------------------
+# ✅ 최신 업데이트 날짜 API
+# ----------------------------
+@app.route('/latest_update_date', methods=['GET'])
+def get_latest_update_date():
+    market_type = request.args.get('market_type')
+
+    if not market_type:
+        return jsonify({"error": "Missing required parameter: market_type"}), 400
+
+    if 'krx' in market_type:
+        table_name = f'krx_date'
+        code = "005930"
+    elif 'usx' in market_type:
+        table_name = f'usx_date'
+        code = "AAPL"
+    else:
+        table_name = f'coin_date'
+        code = "BTC"
+
+    cache_key = f"latest_update_date:{type}"
+    cached_data = redis_client.get(cache_key)
+
+    try:
+        if cached_data:
+            cached_data = json.loads(cached_data)
+            logger.info("🚀 redis에서 불러오기 성공")
+            return jsonify(cached_data)
+    except Exception as e:
+        logger.error(f"❌ 데이터 조회 중 예상치 못한 오류 발생: {e}")
+
+    query = f"""
+        SELECT latest_price_date
+        FROM {table_name}
+        WHERE code = %s
+    """
+
+    try:
+        with get_mysql_connection() as conn:
+            if not conn:  # MySQL 연결 실패 처리
+                return jsonify({"error": "Failed to connect to MySQL"}), 500
+
+            cursor = conn.cursor()
+            cursor.execute(query, (code,))
+            records = cursor.fetchall()
+            cursor.close()
+
+        if not records:
+            return jsonify({"error": f"No data found"}), 404
 
         # ✅ Decimal 값을 float으로 변환
         records = convert_to_serializable(records)
