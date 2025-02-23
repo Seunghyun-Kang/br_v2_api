@@ -507,6 +507,8 @@ def get_profits():
     except Exception as e:
         logger.error(f"❌ 데이터 조회 중 예상치 못한 오류 발생: {e}")
 
+    print("!!!!!!!!!!!!!!!!!!!!!!!!")
+    print(start_date)
     query = f"""
         SELECT date, profit
         FROM {table_name}
