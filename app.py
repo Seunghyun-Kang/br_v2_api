@@ -507,12 +507,10 @@ def get_profits():
     except Exception as e:
         logger.error(f"❌ 데이터 조회 중 예상치 못한 오류 발생: {e}")
 
-    print("!!!!!!!!!!!!!!!!!!!!!!!!")
-    print(start_date)
     query = f"""
         SELECT date, profit
         FROM {table_name}
-        WHERE date >= {start_date} AND profit IS NOT NULL
+        WHERE date >= %s AND profit IS NOT NULL
     """
 
     try:
@@ -521,7 +519,7 @@ def get_profits():
                 return jsonify({"error": "Failed to connect to MySQL"}), 500
 
             cursor = conn.cursor()
-            cursor.execute(query)
+            cursor.execute(query, (start_date,))
             records = cursor.fetchall()
             cursor.close()
 
