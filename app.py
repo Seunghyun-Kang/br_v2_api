@@ -423,7 +423,7 @@ def get_latest_data():
                 query = f"""
                     SELECT *
                     FROM {table_name}
-                    WHERE date = '{today}' AND ideal_signal = 1
+                    WHERE target_date = '{next_market_date}' AND ideal_signal = 1
                 """
                 cursor = conn.cursor()
                 cursor.execute(query)
@@ -432,7 +432,7 @@ def get_latest_data():
                 query = f"""
                     SELECT *
                     FROM {table_name}
-                    WHERE date = '{today}' AND ideal_signal = -1
+                    WHERE target_date = '{next_market_date}' AND ideal_signal = -1
                 """
                 cursor.execute(query)
                 sell_records = cursor.fetchall()
@@ -477,7 +477,7 @@ def get_latest_data():
                         ({signal_buy}) AS buy_sum,
                         ({signal_sell}) AS sell_sum
                     FROM {table_name}
-                    WHERE date = '{today}'
+                    WHERE target_date = '{next_market_date}'
                 """
                 cursor.execute(query)
                 rows = cursor.fetchall()
