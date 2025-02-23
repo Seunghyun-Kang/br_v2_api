@@ -382,6 +382,8 @@ def get_next_market_date(market_type):
 @app.route('/latest_signals', methods=['GET'])
 def get_latest_data():
     market_type = request.args.get('type')
+    signal_type = request.args.get('signal_type')
+
     if not market_type:
         return jsonify({"error": "Missing required parameter: market_type"}), 400
 
@@ -395,7 +397,7 @@ def get_latest_data():
     database = 'be_rich'
 
     # Redis 캐시 확인
-    cache_key = f"signals:{market_type}"
+    cache_key = f"signals:{market_type}:{signal_type}"
     cached_data = redis_client.get(cache_key)
     if cached_data:
         try:
@@ -413,53 +415,87 @@ def get_latest_data():
         return jsonify({"error": "Failed to connect to MySQL"}), 500
 
     try:
-        with get_mysql_connection() as conn:
-            if not conn:
-                return jsonify({"error": "Failed to connect to MySQL"}), 500
-            # 'signal'이 포함된 컬럼명 조회
-            column_query = f"""
-                SELECT COLUMN_NAME
-                FROM INFORMATION_SCHEMA.COLUMNS
-                WHERE TABLE_SCHEMA = '{database}' 
-                AND TABLE_NAME = '{table_name}'
-                AND COLUMN_NAME LIKE '%signal%'
-            """
-            cursor = conn.cursor()
-            cursor.execute(column_query)
-            columns = cursor.fetchall()
-            signal_columns = [row['COLUMN_NAME'] for row in columns]
-            print(f"❌칼럼명 결과: {signal_columns}")
-            if not signal_columns:
-                return jsonify({"error": "No 'signal' columns found"}), 404
+        if signal_type == 'ideal':
+            with get_mysql_connection() as conn:
+                if not conn:
+                    return jsonify({"error": "Failed to connect to MySQL"}), 500
 
-            # 조건문 생성
-            signal_buy = " + ".join([f"(CASE WHEN {col} = 1 THEN 1 ELSE 0 END)" for col in signal_columns])
-            signal_sell = " + ".join([f"(CASE WHEN {col} = -1 THEN 1 ELSE 0 END)" for col in signal_columns])
+                query = f"""
+                    SELECT *
+                    FROM {table_name}
+                    WHERE date = '{today}' AND ideal_signals = 1
+                """
+                cursor = conn.cursor()
+                cursor.execute(query)
+                buy_records = cursor.fetchall()
 
-            query = f"""
-                SELECT *,
-                    ({signal_buy}) AS buy_sum,
-                    ({signal_sell}) AS sell_sum
-                FROM {table_name}
-                WHERE date = '{today}'
-            """
-            cursor.execute(query)
-            rows = cursor.fetchall()
-            cursor.close()
+                query = f"""
+                    SELECT *
+                    FROM {table_name}
+                    WHERE date = '{today}' AND ideal_signals = -1
+                """
+                cursor.execute(query)
+                sell_records = cursor.fetchall()
 
-            # Python에서 필터링
-            buy_records = [row for row in rows if row['buy_sum'] >= 4]
-            sell_records = [row for row in rows if row['sell_sum'] >= 4]
+                cursor.close()
 
-            final = {
-                "today": today,
-                "next": next_market_date,
-                "buy": convert_to_serializable(buy_records),
-                "sell": convert_to_serializable(sell_records)
-            }
-            redis_client.setex(cache_key, 300, json.dumps(final))
+                final = {
+                    "today": today,
+                    "next": next_market_date,
+                    "buy": convert_to_serializable(buy_records),
+                    "sell": convert_to_serializable(sell_records)
+                }
+                redis_client.setex(cache_key, 300, json.dumps(final))
 
-            return jsonify(final)
+                return jsonify(final)
+        else:
+            with get_mysql_connection() as conn:
+                if not conn:
+                    return jsonify({"error": "Failed to connect to MySQL"}), 500
+                # 'signal'이 포함된 컬럼명 조회
+                column_query = f"""
+                    SELECT COLUMN_NAME
+                    FROM INFORMATION_SCHEMA.COLUMNS
+                    WHERE TABLE_SCHEMA = '{database}' 
+                    AND TABLE_NAME = '{table_name}'
+                    AND COLUMN_NAME LIKE '%signal%'
+                """
+                cursor = conn.cursor()
+                cursor.execute(column_query)
+                columns = cursor.fetchall()
+                signal_columns = [row['COLUMN_NAME'] for row in columns]
+                print(f"❌칼럼명 결과: {signal_columns}")
+                if not signal_columns:
+                    return jsonify({"error": "No 'signal' columns found"}), 404
+
+                # 조건문 생성
+                signal_buy = " + ".join([f"(CASE WHEN {col} = 1 THEN 1 ELSE 0 END)" for col in signal_columns])
+                signal_sell = " + ".join([f"(CASE WHEN {col} = -1 THEN 1 ELSE 0 END)" for col in signal_columns])
+
+                query = f"""
+                    SELECT *,
+                        ({signal_buy}) AS buy_sum,
+                        ({signal_sell}) AS sell_sum
+                    FROM {table_name}
+                    WHERE date = '{today}'
+                """
+                cursor.execute(query)
+                rows = cursor.fetchall()
+                cursor.close()
+
+                # Python에서 필터링
+                buy_records = [row for row in rows if row['buy_sum'] >= 4]
+                sell_records = [row for row in rows if row['sell_sum'] >= 4]
+
+                final = {
+                    "today": today,
+                    "next": next_market_date,
+                    "buy": convert_to_serializable(buy_records),
+                    "sell": convert_to_serializable(sell_records)
+                }
+                redis_client.setex(cache_key, 300, json.dumps(final))
+
+                return jsonify(final)
 
 
     except pymysql.MySQLError as e:
