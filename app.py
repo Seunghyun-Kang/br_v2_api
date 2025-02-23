@@ -483,6 +483,7 @@ def get_trade_history():
 def get_profits():
     market_type = request.args.get('type')
     signal_type = request.args.get('signal_type')
+    start_date = request.args.get('start_date')
     uid = request.args.get('uid')
 
     if not market_type:
@@ -495,7 +496,7 @@ def get_profits():
     else:
         table_name = f'coin_trades_{signal_type}'
 
-    cache_key = f"profits:{market_type}:{signal_type}"
+    cache_key = f"profits:{market_type}:{signal_type}:{start_date}"
     cached_data = redis_client.get(cache_key)
 
     try:
@@ -509,6 +510,7 @@ def get_profits():
     query = f"""
         SELECT date, profit
         FROM {table_name}
+        WHERE date >= {start_date} AND profit IS NOT NULL
     """
 
     try:
